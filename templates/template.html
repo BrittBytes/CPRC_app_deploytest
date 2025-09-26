@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- <link rel="stylesheet" href="sample.css"> -->
+        <title>CP Info Card Sample</title>
+
+        <style>
+            /* Root variables for better maintainability */
+            :root {
+            --black: #000;
+            --platinum: #e5e4e2;
+            --primary-blue: #ccd2d4;
+            --white: #fff;
+            --red: #c00000;
+            }
+
+            /* Global Styles */
+            *,
+            *::before,
+            *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            }
+
+            .body {
+            font-family: 'Lucida Sans', Geneva, Verdana, sans-serif;
+            color: var(--black);
+            background: var(--platinum);
+            margin: 50px 0;
+            }
+
+
+            .p {
+            font-size: 14px;
+            color: var(--red);
+            }
+
+            .h2 {
+            font-size: 32px;
+            margin-bottom: 1em;
+            }
+
+            .h3 {
+            font-size: 20px;
+            margin-bottom: 1em;
+            }
+
+           .h4 {
+            font-size: 12px;
+            color: var(--red);
+            }
+
+            .h5 {
+            font-size: 14px;
+            }
+
+            /* Container */
+            .container {
+            width: 90%;
+            margin: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: flex-start;
+            }
+
+            /* Card Styles */
+            .card {
+            width: calc(50% - 20%);
+            cursor: pointer;
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: var(--white);
+            border-radius: 5px;
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+
+            /* square tile */
+            width: 200px;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            transition: all 0.3s ease;
+            }
+
+            /* Card Title */
+            .card-title {
+                font-weight: bold;
+                margin-bottom: 10px;
+                font-size: 16px;
+                /* background-color: var(--white); */
+                padding: 5px;
+                flex-wrap: wrap;
+            }
+
+            /* Card content */
+            .card-content {
+            display: none; /* start collapsed */
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            margin-top: 10px;
+            
+            justify-content: space-between;
+            flex-wrap: wrap; /* Prevents overflow on smaller screens */
+            
+            }
+
+            /* Remove default list styling */
+            .card-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            }
+
+            /* Table Styles */
+            table {
+            width: 100%;
+            border-collapse: collapse;
+            }
+
+            th {
+            background-color: var(--primary-blue);
+            color: var(--white);
+            border: 1px solid var(--black);
+            padding: 5px;
+            text-align: left;
+            font: 12px/20px 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 
+                    'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+            }
+
+            td {
+            border: 1px solid var(--black);
+            padding: .25%;
+            white-space: normal;
+            word-break: break-word;
+            font: 12px/20px 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 
+                    'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+            }
+
+            /* Specific table styles */
+            .table-left, 
+            .table-right {
+            width: 100%;
+            border: 1px solid var(--black);
+            }
+
+
+            /* Responsive Adjustments */
+            @media (max-width: 768px) {
+            .container {
+                width: 95%;
+            }
+
+            .table-tenant, 
+            td {
+                white-space: normal;
+            }
+ 
+            }
+        </style>
+    </head>
+    <script>
+        function expandCard(element) {
+            const content = element.querySelector('.card-content');
+            content.style.display = 'block';
+        }
+
+        function collapseCard(element) {
+            const content = element.querySelector('.card-content');
+            content.style.display = 'none';
+        }
+</script>
+    <body>
+
+        <div class="container">
+            <h2><span id="customer-name">{{customer_name}}</span></h2>
+            <h2><span id="region">{{region}}</span></h2>
+            <h3>Readiness check completed on <span id="date-time">{{date_time}}</span></h3>
+
+            <h5>Tenant name: <span id="tenant-name">{{tenant_name}}</span></h5>
+            <h5>TenantID: <span id="tenant-ID">{{tenant_ID}}</span></h5>
+            <h5>CPRCTimestamp: <span id="cprc-timestamp">{{cprc_timestamp}}</span></h5>
+            <h5>CPRCVersion: <span id="cprc-version">{{cprc_version}}</span></h5>
+
+            <!-- ALL USERS AND ALL DEVICES ESP-->
+            <ul class="card-list">
+                <li class="card"
+                    onclick="collapseCard(this)" 
+                    ondblclick="expandCard(this)">
+
+                    <h3 class="card-title">All users and all devices</h3>
+                    <p><b><span id="all-devices-provisioning-readiness">{{all_devices_provisioning_readiness}}</span></b></p>
+                    <div class="card-content">
+                        <table class="table-left">
+                            <thead>
+                                <th>Name</th>
+                                <th>Value</th>
+                                <th>Required Value</th>
+                            </thead>
+
+                            <tbody>
+                                <tr>
+                                    <td class="td">Show Install Progress</td>
+                                    <td><span id="all-devices-show-install-progress">{{all_devices_show_install_progress}}</span></td>
+                                    <td>True</td>
+                                </tr>
+
+                                <tr>
+                                    <td class="td">ESP Timeout (mins)</td>
+                                    <td><span id="all-devices-esp-timeout">{{all_devices_esp_timeout}}</span></td>
+                                    <td>120-240</td>
+                                </tr>
+
+                                <tr>
+                                    <td class="td">Allow Log Collection</td>
+                                    <td><span id="all-device-allow-log-collection">{{all_devices_allow_log_collection}}</span></td>
+                                    <td>True</td>
+                                </tr>
+
+                                <tr> <!-- still clarifying values-->
+                                    <td class="td">Block Device from User</td>
+                                    <td><span id="all-devices-block-device-by-user">{{all_devices_block_device_by_user}}</span></td>
+                                    <td>True</td>
+                                </tr>
+
+                                <tr> <!-- blocking apps-->
+                                    <td class="td">Block until Apps Install</td>
+                                    <td><span id="all-devices-selected-apps-to-wait-on">{{all_devices_selected_apps_to_wait_on}}</span></td>
+                                    <td>All</td>
+                                </tr>
+
+                                <tr>
+                                    <td class="td">Allow Device Reset on Failure</td>
+                                    <td><span id="all-devices-allow-device-reset-on-failure">{{all_devices_allow_device_reset_on_failure}}</span></td>
+                                    <td>N/A</td> <!-- confirm default value-->
+                                </tr>
+
+                                <tr>
+                                    <td class="td">Allow Device Use on Failure</td>
+                                    <td><span id="all-devices-allow-device-use-on-failure">{{all_devices_allow_device_use_on_failure}}</span></td>
+                                    <td>N/A</td> <!-- confirm default value-->
+                                </tr>
+
+                                <tr>
+                                    <td class="td">Assigned Group Name</td>
+                                    <td><span id="all-devices-assigned-group-name">{{all_devices_assigned_group_name}}</span></td>
+                                    <td>N/A</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </li>
+            </ul>
+            <!-- ALL other ESPs -->
+            <ul class="card-list">
+                {{esp_cards}}
+            </ul>
+            <!--AP Profiles-->
+            <ul class="card-list">
+                {{ap_profiles_card}}
+            </ul>
+        </div>
+    </body>
+</html>

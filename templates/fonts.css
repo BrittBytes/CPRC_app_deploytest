@@ -1,0 +1,15 @@
+/* templates/fonts.css */
+
+/* System font stacks with graceful fallbacks */
+:root {
+  /* Cambria → serif fallback */
+  --font-heading: Cambria, "Times New Roman", Times, "Liberation Serif", serif;
+
+  /* Calibri → sans-serif fallback */
+  --font-body: Calibri, "Helvetica Neue", Arial, "Noto Sans", system-ui, -apple-system, sans-serif;
+}
+
+/* Make body default to Calibri stack */
+html, body, #react-entry-point {
+  font-family: var(--font-body);
+}
