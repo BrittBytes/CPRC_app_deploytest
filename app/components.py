@@ -278,6 +278,105 @@ def build_app_layout():
             dcc.Store(id="memory-output", storage_type="session"),
             dcc.Store(id="file-name", storage_type="session"),
 
+            # ✅ Add the XML store here (visible to callbacks)
+            dcc.Store(id="xml-data", storage_type="session"),
+
+            # App bar
+            html.Div(
+                [
+                    html.Div(
+                        "CPRC Report App",
+                        style={
+                            "fontFamily": THEME["font_heading"],
+                            "fontWeight": THEME["weight_extrabold"],
+                            "fontSize": "20px",
+                            "letterSpacing": ".02em",
+                        },
+                    ),
+                    html.Div(
+                        [
+                            html.Span("Current XML file: ", style={"opacity": 0.8}),
+                            html.Span(id="current-file-label", style={"fontWeight": 600}),
+                            dcc.Upload(
+                                id="upload-data",
+                                children=html.Button("Upload file", style={
+                                    "padding": "6px 10px",
+                                    "borderRadius": "8px",
+                                    "border": "1px solid rgba(255,255,255,0.2)",
+                                    "background": "#124268",
+                                    "color": THEME["on_dark"],
+                                    "cursor": "pointer",
+                                    "marginLeft": "10px",
+                                }),
+                                multiple=False,
+                                style={"display": "inline-block"},
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "center", "gap": "6px"},
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "padding": "10px 12px",
+                    "position": "sticky",
+                    "top": 0,
+                    "zIndex": 3,
+                    "background": THEME["dark_blue_bg"],
+                    "borderBottom": THEME["border_subtle"],
+                },
+            ),
+
+            # Tabs
+            dcc.Tabs(
+                id="tabs",
+                value="overview",
+                persistence=True,
+                persistence_type="session",
+                style={"background": "transparent", "position": "sticky", "top": 48, "zIndex": 2},
+                children=[
+                    dcc.Tab(label="Overview", value="overview", style=tab_style, selected_style=selected_tab_style),
+                    dcc.Tab(label="Applications", value="apps", style=tab_style, selected_style=selected_tab_style),
+                ],
+            ),
+
+            # Pages (both mounted; visibility toggled)
+            html.Div(
+                [
+                    html.Div(id="overview-page", children=build_overview_section()),
+                    # ✅ Put the apps-section INSIDE the apps page
+                    html.Div(id="apps-page", style={"display": "none"}, children=[
+                        html.Div(id="apps-section")  # callback will render tables here
+                    ]),
+                ],
+                id="page-body",
+                style={"padding": "12px"},
+            ),
+        ],
+        style={"minHeight": "100vh", "background": THEME["dark_blue_bg"], "color": THEME["on_dark"]},
+    )
+
+    """Top bar + sticky tabs. Both pages are mounted and visibility toggled via callbacks."""
+    tab_style = {
+        "padding": "8px 14px",
+        "background": "rgba(0,0,0,0.15)",
+        "color": THEME["on_dark"],
+        "border": "1px solid rgba(255,255,255,0.12)",
+        "borderBottom": "none",
+        "marginRight": "8px",
+        "borderTopLeftRadius": "10px",
+        "borderTopRightRadius": "10px",
+        "fontWeight": 600,
+    }
+    selected_tab_style = {**tab_style, "background": "#0b2a44", "borderColor": "rgba(255,255,255,0.28)"}
+
+    return html.Div(
+        [
+            # Persist model + filename for the whole session
+            dcc.Store(id="memory-output", storage_type="session"),
+            dcc.Store(id="file-name", storage_type="session"),
+
             # App bar
             html.Div(
                 [
@@ -349,6 +448,71 @@ def build_app_layout():
             ),
         ],
         style={"minHeight": "100vh", "background": THEME["dark_blue_bg"], "color": THEME["on_dark"]},
+    ),
+
+    [
+            # 🔹 Add these two lines near the top of your layout:
+            dcc.Store(id="xml-data"),  # holds parsed XML data
+            html.Div(id="apps-section"),  # callback fills this dynamically
+
+            # existing sections, e.g. navigation, tabs, pages...
+            html.Div(id="overview-page", style={"display": "block"}),
+            html.Div(id="apps-page", style={"display": "none"}),
+        ]
+
+def build_applications_table(rows: List[Dict]) -> html.Div:
+    columns = [
+        {"name": "Display Name", "id": "Display Name"},
+        {"name": "Publisher", "id": "Publisher"},
+        {"name": "Type", "id": "Type"},
+        {"name": "Size", "id": "Size"},
+        {"name": "Filename", "id": "Filename"},
+        {"name": "Install Cmd", "id": "Install Cmd"},
+        {"name": "Uninstall Cmd", "id": "Uninstall Cmd"},
+        {"name": "Depends On (Count)", "id": "Depends On (Count)", "type": "numeric"},
+        {"name": "Run As", "id": "Run As"},
+        {"name": "Restart Behavior", "id": "Restart Behavior"},
+        {"name": "Rule Type", "id": "Rule Type"},
+        {"name": "Profiles", "id": "Profiles"},
+        {"name": "Profile IDs", "id": "Profile IDs"},
+        {"name": "Groups", "id": "Groups"},
+        {"name": "ESPs (wait-on)", "id": "ESPs (wait-on)"},
+        # Keep ID but hide in UI
+        {"name": "App ID", "id": "App ID", "hideable": True,},
+    ]
+
+    return html.Div(
+        DataTable(
+            id="apps-table",
+            columns=columns,
+            data=rows,
+            # hidden_columns=["App ID"],
+            filter_action="native",
+            sort_action="native",
+            sort_mode="multi",
+            page_action="native",
+            page_size=25,
+            style_table={
+                "overflowX": "auto",
+                "borderRadius": "12px",
+            },
+            style_cell={
+                "fontFamily": THEME["font_mono"],
+                "fontSize": "12px",
+                "padding": "8px",
+                "whiteSpace": "normal",
+                "height": "auto",
+            },
+            style_header={
+                "fontWeight": THEME["weight_semibold"],
+                "textTransform": "uppercase",
+                "letterSpacing": "0.04em",
+            },
+            style_data_conditional=[
+                {"if": {"column_id": "Depends On (Count)"}, "textAlign": "right"},
+            ],
+        ),
+        style={**CARD_BASE, "padding": "12px", "marginTop": "8px"},
     )
 
 def build_overview_section():

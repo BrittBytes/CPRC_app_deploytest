@@ -1,7 +1,7 @@
 # cprc_app/app/model.py
 import os
 import re
-from typing import Any, Optional, List, Tuple
+from typing import Any, Optional, List, Tuple, Dict
 from classes.xml_processor import XMLProcessor
 from app.utils import _as_list, json_safe, _collect_group_names
 
@@ -72,13 +72,15 @@ def infer_profile_esp_edges(model: dict) -> List[dict]:
         meta = p.get("meta") or {}
         groups = _collect_group_names(meta.get("groups"))
         at = meta.get("assignment_target")
-        if at: groups.append(str(at))
+        if at:
+            groups.append(str(at))
         matches = set()
         for g in groups:
             key = str(g).lower()
             for esp in esp_by_group.get(key, []):
                 esp_label = esp.get("name") or esp.get("id")
-                if esp_label: matches.add(esp_label)
+                if esp_label:
+                    matches.add(esp_label)
         for esp_label in sorted(matches):
             edges.append({"profile": p_label, "esp": esp_label})
     return edges
@@ -114,40 +116,136 @@ def _normalize_app_row(app: Any, source: str = "unknown") -> Optional[dict]:
 def _collect_applications(processor: XMLProcessor, model_so_far: dict) -> List[dict]:
     rows: List[dict] = []
 
-    # 1) If your XMLProcessor provides an application list, prefer that.
-    #    (Safe try; if not present, skip.)
+    # 1) Prefer explicit application getters when available.
     for getter in ("get_applications", "get_application_inventory", "get_win32_apps"):
         fn = getattr(processor, getter, None)
         if callable(fn):
             try:
                 for app in (fn() or []):
                     r = _normalize_app_row(app, source=getter)
-                    if r: rows.append(r)
+                    if r:
+                        rows.append(r)
             except Exception:
+                # Be tolerant of shape mismatches in mixed XMLs
                 pass
 
-    # 2) Also include ESP-selected "apps to wait on" as a lightweight application surface.
+    # 2) Also include ESP-selected "apps to wait on".
     for e in (model_so_far.get("esps") or []):
         meta = (e.get("meta") or {})
         apps = meta.get("selected_apps_to_wait_on")
         if isinstance(apps, (list, tuple)):
             for a in apps:
                 r = _normalize_app_row(a, source="esp_selected_apps")
-                if r: rows.append(r)
+                if r:
+                    rows.append(r)
         elif apps:
             r = _normalize_app_row(apps, source="esp_selected_apps")
-            if r: rows.append(r)
+            if r:
+                rows.append(r)
 
     # de-dup by (name,id,source)
     seen = set()
     out: List[dict] = []
     for r in rows:
-        key = (r.get("name","").lower(), (r.get("id") or "").lower(), r.get("source","").lower())
-        if key in seen: 
+        key = (r.get("name", "").lower(), (r.get("id") or "").lower(), r.get("source", "").lower())
+        if key in seen:
             continue
         seen.add(key)
         out.append(r)
     return out
+
+# ------------------------------
+# New: Applications & Dependencies (table-ready)
+# ------------------------------
+
+def _normalize_return_codes(rc: Any) -> str:
+    """Return codes can be list/dict/str; emit a readable string."""
+    if isinstance(rc, list):
+        return ", ".join(map(str, rc))
+    if isinstance(rc, dict):
+        if "Code" in rc:
+            v = rc["Code"]
+            return ", ".join(map(str, v)) if isinstance(v, list) else str(v)
+        return ", ".join(f"{k}:{v}" for k, v in rc.items())
+    return str(rc or "")
+
+def _normalize_dependency_apps(dep_apps_raw: Any) -> str:
+    """
+    dependency_apps may be list[dict], dict, str, or empty.
+    Prefer DisplayName/Name/ID as a visible label.
+    """
+    items: List[str] = []
+    if isinstance(dep_apps_raw, dict):
+        dep_apps_raw = [dep_apps_raw]
+    if isinstance(dep_apps_raw, list):
+        for item in dep_apps_raw:
+            if isinstance(item, dict):
+                name = item.get("DisplayName") or item.get("Name") or item.get("ID")
+                if name:
+                    items.append(str(name))
+            else:
+                items.append(str(item))
+    elif dep_apps_raw:
+        items.append(str(dep_apps_raw))
+    return ", ".join(items)
+
+def _collect_apps_and_dependencies(processor: XMLProcessor) -> Tuple[List[Dict], List[Dict]]:
+    """
+    Uses XMLProcessor.get_applications_and_dependencies() to produce
+    two normalized lists for tables: applications_table, dependencies.
+    """
+    apps_table: List[Dict] = []
+    deps_table: List[Dict] = []
+
+    fn = getattr(processor, "get_applications_and_dependencies", None)
+    if not callable(fn):
+        return apps_table, deps_table
+
+    try:
+        apps_details, app_dependencies = fn()  # [(count, Application), [AppDependencies,...]]
+    except Exception:
+        # Fail-safe: return empty tables if XML shape is unexpected
+        return apps_table, deps_table
+
+    # Applications
+    for app_count, app in (apps_details or []):
+        # getattr to be resilient to namedtuples/dataclasses/objects
+        apps_table.append({
+            "application_count": int(app_count or 0),
+            "display_name": getattr(app, "display_name", "Unknown"),
+            "app_id": getattr(app, "app_id", None) or getattr(app, "id", None),
+            "app_assign_type": getattr(app, "app_assign_type", "Unknown"),
+            "description": getattr(app, "description", "No description"),
+            "publisher": getattr(app, "publisher", "Unknown"),
+            "app_type": getattr(app, "app_type", "Unknown"),
+            "filename": getattr(app, "filename", "Unknown"),
+            "size": getattr(app, "size", "0"),
+            "install_cmd": getattr(app, "install_cmd", "N/A"),
+            "uninstall_cmd": getattr(app, "uninstall_cmd", "N/A"),
+            "dependent_app_count": int(str(getattr(app, "dependent_app_count", 0)).replace(" ", "") or 0),
+            "run_as_acct": getattr(app, "run_as_acct", "System"),
+            "restart_behavior": getattr(app, "restart_behavior", "Default"),
+            "return_codes": _normalize_return_codes(getattr(app, "return_codes", [])),
+            "rule_type": getattr(app, "rule_type", "None"),
+        })
+
+    # Dependencies
+    for dep in (app_dependencies or []):
+        dep_apps_raw = getattr(dep, "dependency_apps", [])
+        deps_table.append({
+            "target_name": getattr(dep, "target_name", "Unknown"),
+            "target_id": getattr(dep, "target_id", None),
+            "target_publisher": getattr(dep, "target_publisher", "Unknown"),
+            "target_type": getattr(dep, "target_type", "Unknown"),
+            "target_dependency_type": getattr(dep, "target_dependency_type", "Unknown"),
+            "dependency_app_count": int(str(getattr(dep, "dependency_app_count", 0)).replace(" ", "") or 0),
+            "dependency_id": getattr(dep, "dependency_id", None),
+            "dependency_apps": _normalize_dependency_apps(dep_apps_raw),
+        })
+
+    return apps_table, deps_table
+
+# ------------------------------
 
 def build_model(filename: str, processor: XMLProcessor, raw_doc: dict) -> dict:
     region, customer = extract_region_customername(filename or "")
@@ -179,6 +277,12 @@ def build_model(filename: str, processor: XMLProcessor, raw_doc: dict) -> dict:
     }
     model["edges"] = infer_profile_esp_edges(model)
 
-    # apps
+    # Existing lightweight application surface
     model["applications"] = _collect_applications(processor, model)
+
+    # New: table-ready Applications & Dependencies from XML
+    applications_table, dependencies = _collect_apps_and_dependencies(processor)
+    model["applications_table"] = applications_table
+    model["dependencies"] = dependencies
+
     return model

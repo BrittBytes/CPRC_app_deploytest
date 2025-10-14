@@ -1,4 +1,5 @@
 # cprc_app/app/callbacks.py
+import json
 import xmltodict
 from dash import html, Input, Output, State, no_update
 import dash
@@ -11,8 +12,10 @@ from app.cyto import build_cytoscape_elements
 from app.components import (
     build_cprc_bubble,
     build_summary_counts_cards,
-    build_applications_section,
+    build_applications_table,
 )
+from app.data_adapters import build_app_rows_from_xml
+
 
 def register_callbacks(app: dash.Dash):
 
@@ -56,9 +59,14 @@ def register_callbacks(app: dash.Dash):
             xml_str = raw_bytes.decode("utf-8", errors="replace")
             doc = xmltodict.parse(xml_str)
 
+            # Build model as before
             from classes.xml_processor import XMLProcessor
             processor = XMLProcessor(doc)
             model = build_model(filename or "", processor, doc)
+
+            # Build deduped Applications rows directly from XML via adapter
+            apps_rows = build_app_rows_from_xml(doc)
+            model["apps_rows"] = apps_rows  # stash for Apps tab
 
             bubble = build_cprc_bubble(model)
             tenant_counts_card = build_summary_counts_cards(model)
@@ -167,7 +175,17 @@ def register_callbacks(app: dash.Dash):
                 "Upload a CPRC XML on the Overview tab to see applications.",
                 style={"opacity": 0.85},
             )
-        return build_applications_section(model)
+
+        # Prefer rows computed at upload time for speed/consistency
+        rows = (model or {}).get("apps_rows") or []
+        if not rows:
+            return html.Div(
+                "No applications were found or failed to extract from this file.",
+                style={"opacity": 0.85},
+            )
+
+        # Render the rich Applications table using the precomputed rows
+        return build_applications_table(rows)
 
     # --- Applications row -> details panel (works with sorting/filtering) ---
     @app.callback(
@@ -192,48 +210,55 @@ def register_callbacks(app: dash.Dash):
         def row(lbl, key):
             return html.Div(
                 [
-                    html.Div(lbl, style={"opacity":0.8}),
-                    html.Div(rec.get(key) or "—", style={"fontWeight":600}),
+                    html.Div(lbl, style={"opacity": 0.8}),
+                    html.Div(rec.get(key) or "—", style={"fontWeight": 600}),
                 ],
-                style={"display":"grid","gridTemplateColumns":"180px 1fr","gap":"8px","marginBottom":"6px"}
+                style={"display": "grid", "gridTemplateColumns": "180px 1fr", "gap": "8px", "marginBottom": "6px"},
             )
 
         summary_rows = [
-            row("Name", "name"),
-            row("ID", "id"),
-            row("Source", "source"),
-            row("Publisher", "publisher"),
-            row("Version", "version"),
-            row("Type", "type"),
-            row("Assignment", "assignment"),
-            row("Platform", "platform"),
-            row("Category", "category"),
-            row("Install Behavior", "install_behavior"),
-            row("Size", "size"),
-            row("Last Modified", "last_modified"),
+            row("Display Name", "Display Name"),
+            row("App ID", "App ID"),
+            row("Publisher", "Publisher"),
+            row("Type", "Type"),
+            row("Filename", "Filename"),
+            row("Size", "Size"),
+            row("Install Cmd", "Install Cmd"),
+            row("Uninstall Cmd", "Uninstall Cmd"),
+            row("Depends On (Count)", "Depends On (Count)"),
+            row("Run As", "Run As"),
+            row("Restart Behavior", "Restart Behavior"),
+            row("Rule Type", "Rule Type"),
+            row("Profiles", "Profiles"),
+            row("Profile IDs", "Profile IDs"),
+            row("Groups", "Groups"),
+            row("ESPs (wait-on)", "ESPs (wait-on)"),
         ]
 
-        # Gather any extra meta.* columns present for this row
-        extra_meta = {k.replace("meta.","",1): v for k, v in rec.items() if k.startswith("meta.") and v not in (None, "")}
+        # Extra meta.* columns (if present)
+        extra_meta = {k.replace("meta.", "", 1): v for k, v in rec.items() if k.startswith("meta.") and v not in (None, "")}
 
         return html.Div(
             [
-                html.Div("Application details", style={"fontWeight":700, "marginBottom":"8px"}),
-                html.Div(summary_rows, style={**CARD_BASE, "padding":"12px", "marginBottom":"10px"}),
-                html.Details([
-                    html.Summary("Raw metadata"),
-                    html.Pre(
-                        json_safe(extra_meta),
-                        style={
-                            "background":"#00182b",
-                            "padding":"10px",
-                            "borderRadius":"8px",
-                            "whiteSpace":"pre-wrap",
-                            "wordBreak":"break-word",
-                            "marginTop":"8px"
-                        }
-                    )
-                ], style={**CARD_BASE, "padding":"10px"})
+                html.Div("Application details", style={"fontWeight": 700, "marginBottom": "8px"}),
+                html.Div(summary_rows, style={**CARD_BASE, "padding": "12px", "marginBottom": "10px"}),
+                html.Details(
+                    [
+                        html.Summary("Raw metadata"),
+                        html.Pre(
+                            json.dumps(json_safe(extra_meta), indent=2),  # stringify dict for rendering
+                            style={
+                                "background": "#00182b",
+                                "padding": "10px",
+                                "borderRadius": "8px",
+                                "whiteSpace": "pre-wrap",
+                                "wordBreak": "break-word",
+                                "marginTop": "8px",
+                            },
+                        ),
+                    ],
+                    style={**CARD_BASE, "padding": "10px"},
+                ),
             ]
         )
 

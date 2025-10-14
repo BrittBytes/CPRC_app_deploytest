@@ -10,6 +10,7 @@ THEME = {
     "on_dark": "#B2DCFF",
     "font_heading": "var(--font-heading)",
     "font_body": "var(--font-body)",
+    "font_mono": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
     "weight_reg": 400,
     "weight_semibold": 600,
     "weight_bold": 700,
