@@ -59,7 +59,7 @@ def build_applications_section(model: dict):
     if not rows:
         return html.Div("No application data found in the uploaded file.", style={**CARD_BASE, "padding": "12px"})
 
-    # ---- Field alias maps for common attributes found across CPRC exports ----
+    # ---- Field alias maps for common attributes found across CPRC exports (apps) ----
     ALIASES = {
         "publisher": {"publisher","appPublisher","developer","vendor","Publisher","Developer","Vendor","PublisherName"},
         "version": {"version","displayVersion","appVersion","productVersion","Version"},
@@ -128,7 +128,7 @@ def build_applications_section(model: dict):
                 continue
         return s  # fallback raw
 
-    # Canonical columns we always try to show (includes dates)
+    # Canonical columns -- always try to show (includes dates)
     base_cols = [
         "name", "id", "source",
         "publisher", "version", "type", "assignment",
@@ -451,7 +451,6 @@ def build_app_layout():
     ),
 
     [
-            # 🔹 Add these two lines near the top of your layout:
             dcc.Store(id="xml-data"),  # holds parsed XML data
             html.Div(id="apps-section"),  # callback fills this dynamically
 
